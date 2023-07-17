@@ -43,22 +43,18 @@ namespace mujoco::plugin::contact_surfaces::sensors
 
 	bool FlatTactileSensor::load(const mjModel *m, mjData *d)
 	{
-		// if (TactileSensorBase::load(m, d) && rosparam_config_.hasMember("resolution")) {
-		// 	resolution = static_cast<double>(rosparam_config_["resolution"]);
+		if (TactileSensorBase::load(m, d) && config_["resolution"].IsDefined()) {
+		 	resolution = config_["resolution"].as<double>();
 
-		// 	double xs = m->geom_size[3 * geomID];
-		// 	double ys = m->geom_size[3 * geomID + 1];
-		// 	cx        = (int)(2 * xs / resolution);
-		// 	cy        = (int)(2 * ys / resolution);
-		// 	vGeoms    = new mjvGeom[cx * cy];
-		// 	ROS_INFO_STREAM_NAMED("mujoco_contact_surface_sensors",
-		// 	                      "Found tactile sensor: " << sensorName << " " << cx << "x" << cy);
-		// 	sensor_msgs::ChannelFloat32 channel;
-		// 	channel.values.resize(cx * cy);
-		// 	channel.name = sensorName;
-		// 	tactile_state_msg_.sensors.push_back(channel);
-		// 	return true;
-		// }
+			double xs = m->geom_size[3 * geomID];
+			double ys = m->geom_size[3 * geomID + 1];
+			cx        = (int)(2 * xs / resolution);
+			cy        = (int)(2 * ys / resolution);
+			vGeoms    = new mjvGeom[cx * cy];
+			std::cout << "mujoco_contact_surface_sensors: " << 
+			                      "Found tactile sensor array of size " << cx << "x" << cy << std::endl;		
+			return true;
+		}
 		return false;
 	}
 
@@ -71,6 +67,7 @@ namespace mujoco::plugin::contact_surfaces::sensors
 			tactile_running_scale = 0.9 * tactile_running_scale + 0.1 * tactile_current_scale;
 			tactile_current_scale = 0.;
 		}
+		mjtNum *sensordata = d->sensordata + sensor_adr;
 		int id = geomID;
 		double xs = m->geom_size[3 * id];
 		double ys = m->geom_size[3 * id + 1];
@@ -108,8 +105,6 @@ namespace mujoco::plugin::contact_surfaces::sensors
 				const int n = mesh.num_elements();
 
 				// get geom transformation
-				// std::vector<int> tris[cx][cy];
-				// std::vector<Vector3<double>> barys[cx][cy];
 				for (int t = 0; t < n; ++t)
 				{
 					// project points onto 2d sensor plane
@@ -138,8 +133,6 @@ namespace mujoco::plugin::contact_surfaces::sensors
 							{
 								int x = (int)std::floor(p[0] / res);
 								int y = (int)std::floor(p[1] / res);
-								// barys[x][y].push_back(bary);
-								// tris[x][y].push_back(t);
 								pressure[x][y].push_back(s->tri_e_MN().Evaluate(t, bary) * s->area(t));
 							}
 						}
@@ -159,27 +152,26 @@ namespace mujoco::plugin::contact_surfaces::sensors
 
 					for (int i = 0; i < nt; ++i)
 					{
-						// int t = tris[x][y][i];
 						mp += pressure[x][y][i];
 					}
 
 					double p0 = mp / nt;
-					// tactile_state_msg_.sensors[0].values[x * cx + y] = p0;
-					// if (visualize) {
-					// 	tactile_current_scale = std::max(std::abs(p0), tactile_current_scale);
-					// 	float ps              = std::min(std::abs(p0), tactile_running_scale) / tactile_running_scale;
+					sensordata[x * cx + y] = p0;
+					if (visualize) {
+						tactile_current_scale = std::max(std::abs(p0), tactile_current_scale);
+						float ps              = std::min(std::abs(p0), tactile_running_scale) / tactile_running_scale;
 
-					// 	const float rgba[4] = { ps, 0, (1.f - ps), 0.8 };
-					// 	Eigen::Vector4d dp  = Mback * Eigen::Vector4d(x * res + res / 2, y * res + res / 2, 0, 1);
-					// 	mjtNum pos[3]       = { dp[0], dp[1], dp[2] };
+						const float rgba[4] = { ps, 0, (1.f - ps), 0.8 };
+						Eigen::Vector4d dp  = Mback * Eigen::Vector4d(x * res + res / 2, y * res + res / 2, 0, 1);
+						mjtNum pos[3]       = { dp[0], dp[1], dp[2] };
 
-					// 	mjvGeom *g = vGeoms + n_vGeom++;
-					// 	mjv_initGeom(g, mjGEOM_BOX, size, pos, rot, rgba);
-					// }
+						mjvGeom *g = vGeoms + n_vGeom++;
+						mjv_initGeom(g, mjGEOM_BOX, size, pos, rot, rgba);
+					}
 				}
 				else
 				{
-					// tactile_state_msg_.sensors[0].values[x * cx + y] = 0;
+					sensordata[x * cx + y] = 0;
 				}
 			}
 		}

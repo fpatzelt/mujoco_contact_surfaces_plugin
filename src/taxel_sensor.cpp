@@ -86,7 +86,7 @@ namespace mujoco::plugin::contact_surfaces::sensors
 			}
 
 			std::cout << "mujoco_contact_surface_sensors: "
-					  << "Found taxel sensor '" << sensorName << "' with " << taxels.size() << " taxels." << std::endl;
+					  << "Found taxel sensor with " << taxels.size() << " taxels." << std::endl;
 			return true;
 		}
 		return false;

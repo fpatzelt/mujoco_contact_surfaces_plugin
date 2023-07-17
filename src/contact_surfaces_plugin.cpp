@@ -914,6 +914,17 @@ namespace mujoco::plugin::contact_surfaces
             }
             if (p["type"].as<std::string>() == "mujoco_contact_surface_sensors/FlatTactileSensor")
             {
+              std::string geomName = p["geomName"].as<std::string>();
+              int geomID = mj_name2id(m, mjOBJ_GEOM, geomName.c_str());
+              if (geomID >= 0)
+              {
+                double resolution = p["resolution"].as<double>();
+                double xs = m->geom_size[3 * geomID];
+                double ys = m->geom_size[3 * geomID + 1];
+                int cx = (int)(2 * xs / resolution);
+                int cy = (int)(2 * ys / resolution);
+                size += cx * cy;
+              }
             }
           }
         }
