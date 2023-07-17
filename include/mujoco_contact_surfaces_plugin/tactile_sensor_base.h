@@ -38,56 +38,55 @@
 #include <mujoco_contact_surfaces_plugin/plugin_utils.h>
 // #include <tactile_msgs/TactileState.h>
 
-namespace mujoco::plugin::contact_surfaces::sensors {
-using namespace mujoco::plugin::contact_surfaces;
-
-// using namespace std::chrono;
-// using namespace MujocoSim;
-
-class TactileSensorBase : public SurfacePlugin
+namespace mujoco::plugin::contact_surfaces::sensors
 {
-public:
-	// Overlead entry point
-	virtual bool load(const mjModel * m, mjData * d);
-	virtual void update(const mjModel *m, mjData *d, const std::vector<GeomCollisionPtr> &geomCollisions, int &sensor_adr);
-	// virtual void renderCallback(mjModel * model, mjData * data, mjvScene *scene);
-	virtual void reset();
+	using namespace mujoco::plugin::contact_surfaces;
 
-private:
-	// Buffer of visual geoms
-	// color scaling factors for tactile visualization
-	double tactile_running_scale = 3.;
-	double tactile_current_scale = 0.;
+	// using namespace std::chrono;
+	// using namespace MujocoSim;
 
-protected:
-	// MuJoCo id of the geom this sensor is attached to
-	int geomID;
-	// Name of the geom this sensor is attached to
-	std::string geomName;
+	class TactileSensorBase : public SurfacePlugin
+	{
+	public:
+		// Overlead entry point
+		virtual bool load(const mjModel *m, mjData *d);
+		virtual void update(const mjModel *m, mjData *d, const std::vector<GeomCollisionPtr> &geomCollisions, int &sensor_adr);
+		virtual void renderCallback(const mjModel *model, mjData *data, mjvScene *scene);
+		virtual void reset();
 
-	// update frequency of the sensor
-	double updateRate;
-	// ros::Duration updatePeriod;
-	double updatePeriod;
-	// time of last sensor update
-	// ros::Time lastUpdate;
-	double lastUpdate;
+	private:
+		// Buffer of visual geoms
+		// color scaling factors for tactile visualization
+		double tactile_running_scale = 3.;
+		double tactile_current_scale = 0.;
 
-	// ros publisher for sensor data
-	// ros::Publisher publisher;
-	// tactile_msgs::TactileState tactile_state_msg_;
-	std::string topicName;
-	std::string sensorName;
+	protected:
+		// MuJoCo id of the geom this sensor is attached to
+		int geomID;
+		// Name of the geom this sensor is attached to
+		std::string geomName;
 
-	bool visualize = false;
-	// geom buffer used for visualization
-	// mjvGeom *vGeoms;
-	// number of geoms in vGeoms
-	// int n_vGeom = 0;
-	// bool initVGeom(int type, const mjtNum size[3], const mjtNum pos[3], const mjtNum mat[9], const float rgba[4]);
-	virtual void internal_update(const mjModel *m, mjData *d, const std::vector<GeomCollisionPtr> &geomCollisions, int &sensor_adr){};
+		// update frequency of the sensor
+		double updateRate;
+		double updatePeriod;
+		// time of last sensor update
+		double lastUpdate;
 
-private:
-};
+		// ros publisher for sensor data
+		// ros::Publisher publisher;
+		// tactile_msgs::TactileState tactile_state_msg_;
+		std::string topicName;
+		std::string sensorName;
+
+		bool visualize = false;
+		// geom buffer used for visualization
+		mjvGeom *vGeoms;
+		// number of geoms in vGeoms
+		int n_vGeom = 0;
+		bool initVGeom(int type, const mjtNum size[3], const mjtNum pos[3], const mjtNum mat[9], const float rgba[4]);
+		virtual void internal_update(const mjModel *m, mjData *d, const std::vector<GeomCollisionPtr> &geomCollisions, int &sensor_adr){};
+
+	private:
+	};
 
 } // namespace mujoco::plugin::contact_surfaces::sensors

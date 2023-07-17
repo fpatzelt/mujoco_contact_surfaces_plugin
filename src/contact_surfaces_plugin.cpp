@@ -738,7 +738,7 @@ namespace mujoco::plugin::contact_surfaces
     }
   }
 
-  void ContactSurfacesPlugin::renderCallback(mjModel *model, mjData *data, mjvScene *scene)
+  void ContactSurfacesPlugin::renderCallback(const mjModel *model, mjData *data, mjvScene *scene)
   {
     if (visualizeContactSurfaces)
     {
@@ -748,10 +748,10 @@ namespace mujoco::plugin::contact_surfaces
         scene->geoms[scene->ngeom++] = vGeoms[i];
       }
     }
-    // for (const auto &plugin : cb_ready_plugins)
-    // {
-    //   plugin->renderCallback(model, data, scene);
-    // }
+    for (const auto &plugin : cb_ready_plugins)
+    {
+      plugin->renderCallback(model, data, scene);
+    }
   }
 
   std::optional<ContactSurfacesPlugin> ContactSurfacesPlugin::Create(
@@ -910,11 +910,6 @@ namespace mujoco::plugin::contact_surfaces
     geomCollisions.clear();
   }
 
-  void ContactSurfacesPlugin::Visualize(const mjModel *m, mjData *d, mjvScene *scn,
-                                        int instance)
-  {
-  }
-
   void ContactSurfacesPlugin::RegisterPlugin()
   {
     mjpPlugin plugin;
@@ -962,7 +957,7 @@ namespace mujoco::plugin::contact_surfaces
                            int instance)
     {
       auto *contact_surfaces_plugin = reinterpret_cast<ContactSurfacesPlugin *>(d->plugin_data[instance]);
-      contact_surfaces_plugin->Visualize(m, d, scn, instance);
+      contact_surfaces_plugin->renderCallback(m, d, scn);
     };
     plugin.nsensordata = +[](const mjModel *m, int instance, int sensor_id)
     {

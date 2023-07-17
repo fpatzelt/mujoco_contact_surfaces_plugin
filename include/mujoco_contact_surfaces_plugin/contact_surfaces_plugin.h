@@ -81,14 +81,7 @@
 
 #include <optional>
 #include <vector>
-#include <chrono>
 #include <filesystem>
-// #include <pluginlib/class_loader.h>
-
-// #include <mujoco_ros/mujoco_sim.h>
-// #include <mujoco_ros/plugin_utils.h>
-
-
 #include <drake/geometry/proximity/make_sphere_mesh.h>
 #include <drake/geometry/proximity/make_sphere_field.h>
 #include <drake/geometry/proximity/make_box_mesh.h>
@@ -113,200 +106,121 @@
 #include <drake/multibody/plant/hydroelastic_traction_calculator.h>
 #include <drake/multibody/plant/coulomb_friction.h>
 #include <drake/multibody/triangle_quadrature/gaussian_triangle_quadrature_rule.h>
-// #include <pluginlib/class_loader.h>
 #include <mujoco_contact_surfaces_plugin/common_types.h>
 #include <mujoco_contact_surfaces_plugin/plugin_utils.h>
 #include <mujoco_contact_surfaces_plugin/flat_tactile_sensor.h>
 #include <mujoco_contact_surfaces_plugin/tactile_sensor_base.h>
 #include <mujoco_contact_surfaces_plugin/taxel_sensor.h>
 
-namespace mujoco::plugin::contact_surfaces {
-
-using namespace std::chrono;
-using namespace drake;
-using namespace drake::geometry;
-using namespace drake::geometry::internal;
-using namespace drake::math;
-using namespace drake::multibody;
-using namespace drake::multibody::internal;
-// using namespace MujocoSim;
-using namespace std::chrono;
-
-const std::string PREFIX = "cs::";
-
-typedef enum _contactType
+namespace mujoco::plugin::contact_surfaces
 {
-	RIGID,
-	SOFT
-} contactType;
 
-// Properties of geoms used for computing contact surfaces
-typedef struct ContactProperties
-{
-	const int mujoco_geom_id;
-	GeometryId drake_id;
-	const std::string geom_name;
-	const contactType contact_type;
-	const Shape *shape;
-	const VolumeMesh<double> *vm;
-	const VolumeMeshFieldLinear<double, double> *pf;
-	const Bvh<Obb, VolumeMesh<double>> *bvh_v;
-	const TriangleSurfaceMesh<double> *sm;
-	const Bvh<Obb, TriangleSurfaceMesh<double>> *bvh_s;
-	const double hydroelastic_modulus;
-	const double dissipation;
-	const double static_friction;
-	const double dynamic_friction;
-	const double resolution_hint;
+	using namespace std::chrono;
+	using namespace drake;
+	using namespace drake::geometry;
+	using namespace drake::geometry::internal;
+	using namespace drake::math;
+	using namespace drake::multibody;
+	using namespace drake::multibody::internal;
+	// using namespace MujocoSim;
+	using namespace std::chrono;
 
-	ContactProperties(int geom_id, std::string geom_name, contactType contact_type, Shape *shape, VolumeMesh<double> *vm,
-	                  VolumeMeshFieldLinear<double, double> *pf, Bvh<Obb, VolumeMesh<double>> *bvh_v,
-	                  double hydroelastic_modulus, double dissipation, double static_friction, double dynamic_friction,
-	                  double resolution_hint)
-	    : mujoco_geom_id(geom_id)
-	    , drake_id(GeometryId::get_new_id())
-	    , geom_name(geom_name)
-	    , contact_type(contact_type)
-	    , shape(shape)
-	    , vm(vm)
-	    , pf(pf)
-	    , bvh_v(bvh_v)
-	    , hydroelastic_modulus(hydroelastic_modulus)
-	    , dissipation(dissipation)
-	    , static_friction(static_friction)
-	    , dynamic_friction(dynamic_friction)
-	    , resolution_hint(resolution_hint){};
-	ContactProperties(int geom_id, std::string geom_name, contactType contact_type, Shape *shape,
-	                  TriangleSurfaceMesh<double> *sm, Bvh<Obb, TriangleSurfaceMesh<double>> *bvh_s,
-	                  double static_friction, double dynamic_friction, double resolution_hint)
-	    : mujoco_geom_id(geom_id)
-	    , drake_id(GeometryId::get_new_id())
-	    , geom_name(geom_name)
-	    , contact_type(contact_type)
-	    , shape(shape)
-	    , sm(sm)
-	    , bvh_s(bvh_s)
-	    , hydroelastic_modulus(std::numeric_limits<double>::infinity())
-	    , dissipation(1.0)
-	    , static_friction(static_friction)
-	    , dynamic_friction(dynamic_friction)
-	    , resolution_hint(resolution_hint){};
-	ContactProperties(int geom_id, std::string geom_name, contactType contact_type, double static_friction,
-	                  double dynamic_friction)
-	    : mujoco_geom_id(geom_id)
-	    , drake_id(GeometryId::get_new_id())
-	    , geom_name(geom_name)
-	    , contact_type(contact_type)
-	    , hydroelastic_modulus(std::numeric_limits<double>::infinity())
-	    , dissipation(1.0)
-	    , static_friction(static_friction)
-	    , dynamic_friction(dynamic_friction)
-	    , resolution_hint(0.0){};
-} ContactProperties;
+	const std::string PREFIX = "cs::";
 
-class ContactSurfacesPlugin
-{
-public:
-	~ContactSurfacesPlugin() = default;
+	typedef enum _contactType
+	{
+		RIGID,
+		SOFT
+	} contactType;
 
-	// Overlead entry point
-	bool load(const mjModel * m, mjData * d, int instance);
+	// Properties of geoms used for computing contact surfaces
+	typedef struct ContactProperties
+	{
+		const int mujoco_geom_id;
+		GeometryId drake_id;
+		const std::string geom_name;
+		const contactType contact_type;
+		const Shape *shape;
+		const VolumeMesh<double> *vm;
+		const VolumeMeshFieldLinear<double, double> *pf;
+		const Bvh<Obb, VolumeMesh<double>> *bvh_v;
+		const TriangleSurfaceMesh<double> *sm;
+		const Bvh<Obb, TriangleSurfaceMesh<double>> *bvh_s;
+		const double hydroelastic_modulus;
+		const double dissipation;
+		const double static_friction;
+		const double dynamic_friction;
+		const double resolution_hint;
 
-	void renderCallback(mjModel * model, mjData * data, mjvScene *scene);
+		ContactProperties(int geom_id, std::string geom_name, contactType contact_type, Shape *shape, VolumeMesh<double> *vm,
+						  VolumeMeshFieldLinear<double, double> *pf, Bvh<Obb, VolumeMesh<double>> *bvh_v,
+						  double hydroelastic_modulus, double dissipation, double static_friction, double dynamic_friction,
+						  double resolution_hint)
+			: mujoco_geom_id(geom_id), drake_id(GeometryId::get_new_id()), geom_name(geom_name), contact_type(contact_type), shape(shape), vm(vm), pf(pf), bvh_v(bvh_v), hydroelastic_modulus(hydroelastic_modulus), dissipation(dissipation), static_friction(static_friction), dynamic_friction(dynamic_friction), resolution_hint(resolution_hint){};
+		ContactProperties(int geom_id, std::string geom_name, contactType contact_type, Shape *shape,
+						  TriangleSurfaceMesh<double> *sm, Bvh<Obb, TriangleSurfaceMesh<double>> *bvh_s,
+						  double static_friction, double dynamic_friction, double resolution_hint)
+			: mujoco_geom_id(geom_id), drake_id(GeometryId::get_new_id()), geom_name(geom_name), contact_type(contact_type), shape(shape), sm(sm), bvh_s(bvh_s), hydroelastic_modulus(std::numeric_limits<double>::infinity()), dissipation(1.0), static_friction(static_friction), dynamic_friction(dynamic_friction), resolution_hint(resolution_hint){};
+		ContactProperties(int geom_id, std::string geom_name, contactType contact_type, double static_friction,
+						  double dynamic_friction)
+			: mujoco_geom_id(geom_id), drake_id(GeometryId::get_new_id()), geom_name(geom_name), contact_type(contact_type), hydroelastic_modulus(std::numeric_limits<double>::infinity()), dissipation(1.0), static_friction(static_friction), dynamic_friction(dynamic_friction), resolution_hint(0.0){};
+	} ContactProperties;
 
-	// Called on reset
-	void reset();
-	int collision_cb(const mjModel *m, const mjData *d, mjContact *con, int g1, int g2, mjtNum margin);
-	void passive_cb(const mjModel *m, mjData *d);
-	// void onGeomChanged(mjModel * model, mjData * data, const int geom_id);
+	class ContactSurfacesPlugin
+	{
+	public:
+		~ContactSurfacesPlugin() = default;
 
-  static std::optional<ContactSurfacesPlugin> Create(const mjModel* m, mjData* d, int instance);
-  ContactSurfacesPlugin(ContactSurfacesPlugin&&) = default;
+		// Overlead entry point
+		bool load(const mjModel *m, mjData *d, int instance);
 
-  void Compute(const mjModel* m, mjData* d, int instance);
-  void Visualize(const mjModel* m, mjData* d, mjvScene* scn, int instance);
+		void renderCallback(const mjModel *model, mjData *data, mjvScene *scene);
 
-  static void RegisterPlugin();
+		// Called on reset
+		void reset();
+		int collision_cb(const mjModel *m, const mjData *d, mjContact *con, int g1, int g2, mjtNum margin);
+		void passive_cb(const mjModel *m, mjData *d);
 
-protected:
-	// Mujoco model and data pointers
-	const mjModel * m_;
-	mjData * d_;
-	bool visualizeContactSurfaces = false;
-	bool applyContactSurfaceForces = true;
-	std::vector<GeomCollisionPtr> geomCollisions;
+		static std::optional<ContactSurfacesPlugin> Create(const mjModel *m, mjData *d, int instance);
+		ContactSurfacesPlugin(ContactSurfacesPlugin &&) = default;
 
-private:
+		void Compute(const mjModel *m, mjData *d, int instance);
 
- 	ContactSurfacesPlugin(const mjModel* m, mjData* d, int instance);
+		static void RegisterPlugin();
 
-	// Buffer of visual geoms
-	mjvGeom *vGeoms = new mjvGeom[MAX_VGEOM];
-	int n_vGeom     = 0;
-	// color scaling factors for contact
-	double running_scale = 3.;
-	double current_scale = 0.;
+	protected:
+		// Mujoco model and data pointers
+		const mjModel *m_;
+		mjData *d_;
+		bool visualizeContactSurfaces = false;
+		bool applyContactSurfaceForces = true;
+		std::vector<GeomCollisionPtr> geomCollisions;
 
-	// TODO there seems to be a bug where this is not correctly parsed
-	HydroelasticContactRepresentation hydroelastic_contact_representation = HydroelasticContactRepresentation::kTriangle;
+	private:
+		ContactSurfacesPlugin(const mjModel *m, mjData *d, int instance);
 
-	std::map<int, ContactProperties *> contactProperties;
+		// Buffer of visual geoms
+		mjvGeom *vGeoms = new mjvGeom[MAX_VGEOM];
+		int n_vGeom = 0;
+		// color scaling factors for contact
+		double running_scale = 3.;
+		double current_scale = 0.;
 
-	void parseMujocoCustomFields(const mjModel *m);
-	void initCollisionFunction();
+		// TODO there seems to be a bug where this is not correctly parsed
+		HydroelasticContactRepresentation hydroelastic_contact_representation = HydroelasticContactRepresentation::kTriangle;
 
-	void evaluateContactSurface(const mjModel *m, const mjData *d, GeomCollisionPtr gc);
-	template <class T>
-	void visualizeMeshElement(int face, T mesh, double fn);
+		std::map<int, ContactProperties *> contactProperties;
 
-	// Interface loader
-	// boost::shared_ptr<pluginlib::ClassLoader<SurfacePlugin>> surface_plugin_loader;
-	// list of registered and loaded plugins
-	std::vector<SurfacePluginPtr> plugins, cb_ready_plugins;
-};
+		void parseMujocoCustomFields(const mjModel *m);
+		void initCollisionFunction();
 
-// } // namespace mujoco_contact_surfaces
+		void evaluateContactSurface(const mjModel *m, const mjData *d, GeomCollisionPtr gc);
+		template <class T>
+		void visualizeMeshElement(int face, T mesh, double fn);
 
-// #ifndef MUJOCO_CONTACT_SURFACES_PLUGIN_H_
-// #define MUJOCO_CONTACT_SURFACES_PLUGIN_H_
-
-// #include <optional>
-// #include <vector>
-
-// #include <mujoco/mjdata.h>
-// #include <mujoco/mjmodel.h>
-// #include <mujoco/mjtnum.h>
-// #include <mujoco/mjvisualize.h>
-
-
-// namespace mujoco::plugin::contact_surfaces {
-
-// class ContactSurfacesPlugin {
-//  public:
-//   // Creates a new ContactSurfacesPlugin instance (allocated with `new`) or
-//   // returns null on failure.
-//   static std::optional<ContactSurfacesPlugin> Create(const mjModel* m, mjData* d, int instance);
-//   ContactSurfacesPlugin(ContactSurfacesPlugin&&) = default;
-//   ~ContactSurfacesPlugin() = default;
-
-//   void Compute(const mjModel* m, mjData* d, int instance);
-//   void Visualize(const mjModel* m, mjData* d, mjvScene* scn, int instance);
-
-//   static void RegisterPlugin();
-
-//   // int i0;                         // index of first body
-//   // int n;                          // number of bodies in the cable
-//   // std::vector<int> prev;          // indices of previous bodies   (n x 1)
-//   // std::vector<int> next;          // indices of next bodies       (n x 1)
-//   // std::vector<mjtNum> stiffness;  // stiffness parameters         (n x 4)
-//   // std::vector<mjtNum> omega0;     // reference curvature          (n x 3)
-//   // std::vector<mjtNum> stress;     // mechanical stress            (n x 3)
-//   // mjtNum vmax;                    // max value in colormap
-
-//  private:
-//   ContactSurfacesPlugin(const mjModel* m, mjData* d, int instance);
-// };
-
-}  // namespace mujoco::plugin::contact_surfaces
-
-// #endif  // MUJOCO_CONTACT_SURFACES_PLUGIN_H_
+		// Interface loader
+		// boost::shared_ptr<pluginlib::ClassLoader<SurfacePlugin>> surface_plugin_loader;
+		// list of registered and loaded plugins
+		std::vector<SurfacePluginPtr> plugins, cb_ready_plugins;
+	};
+} // namespace mujoco::plugin::contact_surfaces
