@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2022, Bielefeld University
+ *  Copyright (c) 2023, Bielefeld University
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -36,14 +36,10 @@
 #pragma once
 
 #include <mujoco_contact_surfaces_plugin/plugin_utils.h>
-// #include <tactile_msgs/TactileState.h>
 
 namespace mujoco::plugin::contact_surfaces::sensors
 {
 	using namespace mujoco::plugin::contact_surfaces;
-
-	// using namespace std::chrono;
-	// using namespace MujocoSim;
 
 	class TactileSensorBase : public SurfacePlugin
 	{
@@ -71,12 +67,6 @@ namespace mujoco::plugin::contact_surfaces::sensors
 		double updatePeriod;
 		// time of last sensor update
 		double lastUpdate;
-
-		// ros publisher for sensor data
-		// ros::Publisher publisher;
-		// tactile_msgs::TactileState tactile_state_msg_;
-		std::string topicName;
-		std::string sensorName;
 
 		bool visualize = false;
 		// geom buffer used for visualization

@@ -40,7 +40,6 @@
 #include <boost/shared_ptr.hpp>
 #include <yaml-cpp/yaml.h>
 #include <mujoco.h>
-// #include <mujoco_ros/common_types.h>
 
 namespace mujoco::plugin::contact_surfaces {
 

@@ -1,7 +1,7 @@
 /**
  *
  * Parts of the code used to evaluate the contact surfaces
- * (namely the methods evaluateContactSurfaces and passive_cb)
+ * (namely the methods evaluateContactSurfaces and Compute)
  * are based on code of Drake which is licensed as follows:
  *
  * All components of Drake are licensed under the BSD 3-Clause License
@@ -180,28 +180,13 @@ namespace mujoco::plugin::contact_surfaces
 
   bool ContactSurfacesPlugin::load(const mjModel *m, mjData *d, int instance)
   {
-    // std::cout << "mujoco_contact_surfaces: " << "Loading mujoco_contact_surfaces plugin ...");
-
-    // // Check that ROS has been initialized
-    // if (!ros::isInitialized())
-    // {
-    //   ROS_FATAL_STREAM_NAMED("mujoco_contact_surfaces",
-    //                          "A ROS node for Mujoco has not been initialized, unable to load plugin.");
-    //   return false;
-    // }
-
-    // std::string robot_namespace_ = node_handle_->getNamespace();
-    // ROS_ASSERT(rosparam_config_.getType() == XmlRpc::XmlRpcValue::TypeStruct);
-
     parseMujocoCustomFields(m);
     d_ = d;
     m_ = m;
-    // instance = this;
-    // if (instance_map.size() == 1)
-    // {
-    initCollisionFunction();
-    // }
 
+    initCollisionFunction();
+
+    // Parse, register and load plugins
     std::string sensor_config = mj_getPluginConfig(m, instance, "sensor_config");
 
     if (!sensor_config.empty() and std::filesystem::exists(sensor_config))
@@ -210,18 +195,10 @@ namespace mujoco::plugin::contact_surfaces
 
       for (YAML::Node config : root["MujocoPlugins"])
       {
-        // YAML::Node config = plugins[j];
-        // assert_perror(config.IsMap());
-        // assert(config["type"].IsDefined());
-        // assert(config["type"].as<std::string>() == "mujoco_contact_surfaces/MujocoContactSurfacesPlugin");
-        // assert(config["SurfacePlugins"].IsDefined());
-        // assert(config["SurfacePlugins"].IsSequence());
         std::cout << "Num plugins: " << config["SurfacePlugins"].size() << std::endl;
         for (int i = 0; i < config["SurfacePlugins"].size(); ++i)
         {
           YAML::Node p = config["SurfacePlugins"][i];
-          assert(p.IsMap());
-          assert(p["type"].IsDefined());
           if (p["type"].as<std::string>() == "mujoco_contact_surface_sensors/TaxelSensor")
           {
             SurfacePluginPtr s(new TaxelSensor());
@@ -237,14 +214,6 @@ namespace mujoco::plugin::contact_surfaces
         }
       }
     }
-
-    // Parse, register and load plugins
-    // XmlRpc::XmlRpcValue plugin_config;
-    // if (mujoco_contact_surfaces::plugin_utils::parsePlugins(rosparam_config_, surface_plugin_loader, plugin_config))
-    // {
-    //   mujoco_contact_surfaces::plugin_utils::registerPlugins(node_handle_, plugin_config, surface_plugin_loader,
-    //                                                          plugins);
-    // }
     for (const auto &plugin : plugins)
     {
 
@@ -253,20 +222,7 @@ namespace mujoco::plugin::contact_surfaces
         cb_ready_plugins.push_back(plugin);
       }
     }
-
-    // ROS_INFO_NAMED("mujoco_contact_surfaces", "Loaded mujoco_contact_surfaces");
     return true;
-  }
-
-  void ContactSurfacesPlugin::reset()
-  {
-    geomCollisions.clear();
-    // for (const auto &plugin : plugins)
-    // {
-    //   plugin->safe_reset();
-    // }
-    // contactProperties.clear();
-    // instance_map.erase(d_);
   }
 
   int ContactSurfacesPlugin::collision_cb(const mjModel *m, const mjData *d, mjContact *con, int g1, int g2,
@@ -484,19 +440,10 @@ namespace mujoco::plugin::contact_surfaces
         if (hcp.find("kTriangle") != std::string::npos)
         {
           hydroelastic_contact_representation = HydroelasticContactRepresentation::kTriangle;
-          // std::cout << "mujoco_contact_surfaces: "
-          //           << "Found HydroelasticContactRepresentation: kTriangle" << std::endl;
         }
         else if (hcp.find("kPolygon") != std::string::npos)
         {
           hydroelastic_contact_representation = HydroelasticContactRepresentation::kPolygon;
-          // std:: << "mujoco_contact_surfaces: "
-          //           << "Found HydroelasticContactRepresentation: kPolygon" << std::endl;
-        }
-        else
-        {
-          // std::cout << "mujoco_contact_surfaces: "
-          //           << "No HydroelasticContactRepresentation found. Using default: kPolygon" << std::endl;
         }
       }
     }
@@ -510,7 +457,6 @@ namespace mujoco::plugin::contact_surfaces
       {
         visualizeContactSurfaces = m->numeric_data[vs_adr];
       }
-      // std::cout << "mujoco_contact_surfaces: " << "VisualizeContactSurfaces: " << visualizeContactSurfaces);
     }
     // parse ApplyContactSurfaceForces
     int apsf_id = mj_name2id(m, mjOBJ_NUMERIC, (PREFIX + "ApplyContactSurfaceForces").c_str());
@@ -522,7 +468,6 @@ namespace mujoco::plugin::contact_surfaces
       {
         applyContactSurfaceForces = m->numeric_data[apsf_adr];
       }
-      // std::cout << "mujoco_contact_surfaces: " << "ApplyContactSurfaceForces: " << applyContactSurfaceForces);
     }
     // parse geom contact properties
     for (int i = 0; i < m->nnumeric; ++i)
@@ -757,24 +702,13 @@ namespace mujoco::plugin::contact_surfaces
   std::optional<ContactSurfacesPlugin> ContactSurfacesPlugin::Create(
       const mjModel *m, mjData *d, int instance)
   {
-    // if (CheckAttr("twist", m, instance) && CheckAttr("bend", m, instance)) {
     return ContactSurfacesPlugin(m, d, instance);
-    // } else {
-    //   mju_warning("Invalid parameter specification in ContactSurfacesPlugin plugin");
-    //   return std::nullopt;
-    // }
   }
 
   // plugin constructor
   ContactSurfacesPlugin::ContactSurfacesPlugin(const mjModel *m, mjData *d, int instance)
   {
   }
-
-  // ContactSurfacesPlugin::~ContactSurfacesPlugin()
-  //   {
-  //     plugins.clear();
-  //     cb_ready_plugins.clear();
-  //   }
 
   void ContactSurfacesPlugin::Compute(const mjModel *m, mjData *d, int instance)
   {
@@ -946,7 +880,6 @@ namespace mujoco::plugin::contact_surfaces
     plugin.compute =
         +[](const mjModel *m, mjData *d, int instance, int capability_bit)
     {
-      // std::cout << "plugin.compute " << capability_bit << std::endl;
       if (capability_bit & mjPLUGIN_PASSIVE)
       {
         auto *contact_surfaces_plugin = reinterpret_cast<ContactSurfacesPlugin *>(d->plugin_data[instance]);

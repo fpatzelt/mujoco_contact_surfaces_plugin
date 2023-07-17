@@ -31,21 +31,15 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
-
 /* Authors: Florian Patzelt*/
 
 #pragma once
 
-// #include <ros/ros.h>
 #include <mujoco_contact_surfaces_plugin/common_types.h>
 #include <iostream>
 
-// #include <pluginlib/class_loader.h>
-
 namespace mujoco::plugin::contact_surfaces
 {
-	// using namespace MujocoSim;
-
 	class SurfacePlugin
 	{
 	public:
@@ -69,10 +63,6 @@ namespace mujoco::plugin::contact_surfaces
 		{
 			loading_successful_ = load(m, d);
 			if (!loading_successful_)
-				// ROS_WARN_STREAM_NAMED("contact_surface_plugin",
-				//                       "Plugin of type '"
-				//                           << rosparam_config_["type"] << "' and full config '" << rosparam_config_
-				//                           << "' failed to load. It will be ignored until the next load attempt.");
 				std::cout << "contact_surface_plugin: "
 						  << "Plugin of type '"
 						  << config_["type"].as<std::string>() << "' failed to load. It will be ignored until the next load attempt." << std::endl;

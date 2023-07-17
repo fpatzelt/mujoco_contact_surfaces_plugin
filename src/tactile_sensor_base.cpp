@@ -80,9 +80,6 @@ namespace mujoco::plugin::contact_surfaces::sensors
 	{
 		if (visualize)
 		{
-			// ROS_WARN_STREAM_COND_NAMED(
-			//     scene->maxgeom < n_vGeom, "mujoco_contact_surface_sensors",
-			//     "Not all vgeoms could be visualized: n_vGeom = " << n_vGeom << " scene->maxgeom = " << scene->maxgeom);
 			for (int i = 0; i < n_vGeom && scene->ngeom < scene->maxgeom; ++i)
 			{
 				scene->geoms[scene->ngeom++] = vGeoms[i];

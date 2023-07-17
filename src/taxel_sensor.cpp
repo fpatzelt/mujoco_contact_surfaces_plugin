@@ -60,8 +60,6 @@ namespace mujoco::plugin::contact_surfaces::sensors
 			}
 			else
 			{
-				// ROS_ERROR_STREAM_NAMED("mujoco_contact_surface_sensors",
-				//                        "Could not find any match for method: " << method_string);
 				return false;
 			}
 			if (visualize)
@@ -320,7 +318,6 @@ namespace mujoco::plugin::contact_surfaces::sensors
 			// If there are no sampled points on the surface fill the sensor message with zeros
 			for (int i = 0; i < n; ++i)
 			{
-				// tactile_state_msg_.sensors[0].values[i] = 0;
 				sensordata[i] = 0;
 			}
 		}

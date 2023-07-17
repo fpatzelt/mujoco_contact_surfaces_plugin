@@ -122,7 +122,6 @@ namespace mujoco::plugin::contact_surfaces
 	using namespace drake::math;
 	using namespace drake::multibody;
 	using namespace drake::multibody::internal;
-	// using namespace MujocoSim;
 	using namespace std::chrono;
 
 	const std::string PREFIX = "cs::";
@@ -206,7 +205,6 @@ namespace mujoco::plugin::contact_surfaces
 		double running_scale = 3.;
 		double current_scale = 0.;
 
-		// TODO there seems to be a bug where this is not correctly parsed
 		HydroelasticContactRepresentation hydroelastic_contact_representation = HydroelasticContactRepresentation::kTriangle;
 
 		std::map<int, ContactProperties *> contactProperties;
@@ -218,8 +216,6 @@ namespace mujoco::plugin::contact_surfaces
 		template <class T>
 		void visualizeMeshElement(int face, T mesh, double fn);
 
-		// Interface loader
-		// boost::shared_ptr<pluginlib::ClassLoader<SurfacePlugin>> surface_plugin_loader;
 		// list of registered and loaded plugins
 		std::vector<SurfacePluginPtr> plugins, cb_ready_plugins;
 	};
