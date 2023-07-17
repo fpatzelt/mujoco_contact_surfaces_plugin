@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2023, Bielefeld University
+ *  Copyright (c) 2022, Bielefeld University
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -31,52 +31,31 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
-
 /* Authors: Florian Patzelt*/
 
 #pragma once
 
-#include <drake/geometry/query_results/contact_surface.h>
-#include <boost/shared_ptr.hpp>
-#include <yaml-cpp/yaml.h>
-#include <mujoco.h>
-// #include <mujoco_ros/common_types.h>
+#include <mujoco_contact_surfaces_plugin/tactile_sensor_base.h>
 
-namespace mujoco::plugin::contact_surfaces {
+namespace mujoco::plugin::contact_surfaces::sensors {
+using namespace mujoco::plugin::contact_surfaces;
 
-// Maximum number of geoms for visualization
-const int MAX_VGEOM = 10000;
-
-// Point collision that approximates a collision area
-typedef struct PointCollision
+class FlatTactileSensor : public TactileSensorBase
 {
-	drake::Vector3<double> p;
-	drake::Vector3<double> n;
-	double fn0;
-	double stiffness;
-	double damping;
-	int face;
-} PointCollision;
+public:
+	// Overlead entry point
+	virtual bool load(const mjModel * m, mjData * d);
+	virtual int getSensorSize();
 
-// Collision between two geoms
-typedef struct GeomCollision
-{
-	std::vector<PointCollision> pointCollisions;
-	std::shared_ptr<drake::geometry::ContactSurface<double>> s;
-	int g1;
-	int g2;
-	GeomCollision(int g1, int g2, drake::geometry::ContactSurface<double> *s) : g1(g1), g2(g2), s(s){};
-} GeomCollision;
+protected:
+	virtual void internal_update(const mjModel *m, mjData *d, const std::vector<GeomCollisionPtr> &geomCollisions, int &sensor_adr);
 
-// SurfacePlugin
-class SurfacePlugin;
+private:
+	double resolution;
+	int cx, cy;
+	// color scaling factors for tactile visualization
+	double tactile_running_scale = 3.;
+	double tactile_current_scale = 0.;
+};
 
-/**
- * @def SurfacePluginPtr
- * @brief boost::shared_ptr to SurfacePlugin
- */
-typedef boost::shared_ptr<SurfacePlugin> SurfacePluginPtr;
-typedef boost::shared_ptr<GeomCollision> GeomCollisionPtr;
-
-
-} // namespace mujoco::plugin::contact_surfaces
+} // namespace mujoco::plugin::contact_surfaces::sensors

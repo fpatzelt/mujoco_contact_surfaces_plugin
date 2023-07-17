@@ -10,19 +10,27 @@ find_package(mujoco 2.3.3 REQUIRED)
 find_package(drake REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED Eigen)
 find_package(Boost)
+find_package(yaml-cpp 0.7 REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
-  src/contact_surfaces_plugin.cc
+  src/contact_surfaces_plugin.cpp
+  src/tactile_sensor_base.cpp
+  src/flat_tactile_sensor.cpp
+  src/taxel_sensor.cpp
 )
+
 target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
   include  
   ${Eigen_INCLUDE_DIRS}
   ${drake_INCLUDE_DIRS}
   ${mujoco_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
+  ${YAML_CPP_INCLUDE_DIR}
 )
+
 target_link_libraries(${PROJECT_NAME}  
   drake::drake
   ${mujoco_LIBRARIES}
   ${Boost_LIBRARIES}
+  ${YAML_CPP_LIBRARIES}
 )

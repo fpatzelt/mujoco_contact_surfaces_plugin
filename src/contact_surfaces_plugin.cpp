@@ -81,7 +81,7 @@
 
 namespace mujoco::plugin::contact_surfaces
 {
-
+  using namespace mujoco::plugin::contact_surfaces::sensors;
   namespace
   {
     int instance_id = -1;
@@ -178,7 +178,7 @@ namespace mujoco::plugin::contact_surfaces
 
   } // namespace
 
-  bool ContactSurfacesPlugin::load(const mjModel *m, mjData *d)
+  bool ContactSurfacesPlugin::load(const mjModel *m, mjData *d, int instance)
   {
     // std::cout << "mujoco_contact_surfaces: " << "Loading mujoco_contact_surfaces plugin ...");
 
@@ -202,6 +202,42 @@ namespace mujoco::plugin::contact_surfaces
     initCollisionFunction();
     // }
 
+    std::string sensor_config = mj_getPluginConfig(m, instance, "sensor_config");
+
+    if (!sensor_config.empty() and std::filesystem::exists(sensor_config))
+    {
+      YAML::Node root = YAML::LoadFile(sensor_config);
+
+      for (YAML::Node config : root["MujocoPlugins"])
+      {
+        // YAML::Node config = plugins[j];
+        // assert_perror(config.IsMap());
+        // assert(config["type"].IsDefined());
+        // assert(config["type"].as<std::string>() == "mujoco_contact_surfaces/MujocoContactSurfacesPlugin");
+        // assert(config["SurfacePlugins"].IsDefined());
+        // assert(config["SurfacePlugins"].IsSequence());
+        std::cout << "Num plugins: " << config["SurfacePlugins"].size() << std::endl;
+        for (int i = 0; i < config["SurfacePlugins"].size(); ++i)
+        {
+          YAML::Node p = config["SurfacePlugins"][i];
+          assert(p.IsMap());
+          assert(p["type"].IsDefined());
+          if (p["type"].as<std::string>() == "mujoco_contact_surface_sensors/TaxelSensor")
+          {
+            SurfacePluginPtr s(new TaxelSensor());
+            s->init(p);
+            plugins.push_back(s);
+          }
+          if (p["type"].as<std::string>() == "mujoco_contact_surface_sensors/FlatTactileSensor")
+          {
+            SurfacePluginPtr s(new FlatTactileSensor());
+            s->init(p);
+            plugins.push_back(s);
+          }
+        }
+      }
+    }
+
     // Parse, register and load plugins
     // XmlRpc::XmlRpcValue plugin_config;
     // if (mujoco_contact_surfaces::plugin_utils::parsePlugins(rosparam_config_, surface_plugin_loader, plugin_config))
@@ -209,13 +245,14 @@ namespace mujoco::plugin::contact_surfaces
     //   mujoco_contact_surfaces::plugin_utils::registerPlugins(node_handle_, plugin_config, surface_plugin_loader,
     //                                                          plugins);
     // }
-    // for (const auto &plugin : plugins)
-    // {
-    //   if (plugin->safe_load(m, d))
-    //   {
-    //     cb_ready_plugins.push_back(plugin);
-    //   }
-    // }
+    for (const auto &plugin : plugins)
+    {
+
+      if (plugin->safe_load(m, d))
+      {
+        cb_ready_plugins.push_back(plugin);
+      }
+    }
 
     // ROS_INFO_NAMED("mujoco_contact_surfaces", "Loaded mujoco_contact_surfaces");
     return true;
@@ -386,129 +423,6 @@ namespace mujoco::plugin::contact_surfaces
     }
   }
 
-  void ContactSurfacesPlugin::passive_cb(const mjModel *m, mjData *d)
-  {
-    if (visualizeContactSurfaces)
-    {
-      // reset the visualized geoms
-      n_vGeom = 0;
-      running_scale = 0.9 * running_scale + 0.1 * current_scale;
-      current_scale = 0.;
-    }
-
-    const double stiction_tolerance = 1.0e-4; // TODO should this be hardcoded?
-    const double relative_tolerance = 1.0e-2;
-    for (GeomCollisionPtr gc : geomCollisions)
-    {
-      int g1 = gc->g1;
-      int g2 = gc->g2;
-      ContactProperties *cp1 = contactProperties[g1];
-      ContactProperties *cp2 = contactProperties[g2];
-      const CoulombFriction<double> &geometryM_friction =
-          CoulombFriction<double>{cp1->static_friction, cp1->dynamic_friction};
-      const CoulombFriction<double> &geometryN_friction =
-          CoulombFriction<double>{cp2->static_friction, cp2->dynamic_friction};
-      const CoulombFriction<double> combined_friction =
-          CalcContactFrictionFromSurfaceProperties(geometryM_friction, geometryN_friction);
-      const double mu_coulomb = combined_friction.dynamic_friction();
-      for (PointCollision pc : gc->pointCollisions)
-      {
-        const RigidTransform<double> &X_WA = getGeomPose(g1, d);
-        const RigidTransform<double> &X_WB = getGeomPose(g2, d);
-        const SpatialVelocity<double> &V_WA = getGeomVelocity(g1, m, d);
-        const SpatialVelocity<double> &V_WB = getGeomVelocity(g2, m, d);
-
-        const Vector3<double> p_AoAq_W = pc.p - X_WA.translation();
-        const SpatialVelocity<double> V_WAq = V_WA.Shift(p_AoAq_W);
-
-        // Next compute the spatial velocity of Body B at Bq.
-        const Vector3<double> p_BoBq_W = pc.p - X_WB.translation();
-        const SpatialVelocity<double> V_WBq = V_WB.Shift(p_BoBq_W);
-
-        // Finally compute the relative velocity of Frame Aq relative to Frame Bq,
-        // expressed in the world frame, and then the translational component of this
-        // velocity.
-        const SpatialVelocity<double> V_BqAq_W = V_WAq - V_WBq;
-        const Vector3<double> &v_BqAq_W = V_BqAq_W.translational();
-
-        // Get the velocity along the normal to the contact surface. Note that a
-        // positive value indicates that bodies are separating at Q while a negative
-        // value indicates that bodies are approaching at Q.
-        const double vn_BqAq_W = v_BqAq_W.dot(pc.n);
-
-        const double fn = std::max(0., 1. - pc.damping * vn_BqAq_W) * (pc.fn0 - 0.001 * pc.stiffness * vn_BqAq_W);
-
-        if (applyContactSurfaceForces)
-        {
-          const Vector3<double> vt = v_BqAq_W - pc.n * vn_BqAq_W;
-          double epsilon = stiction_tolerance * relative_tolerance;
-          epsilon = epsilon * epsilon;
-          const double v_slip = std::sqrt(vt.squaredNorm() + epsilon);
-          const Vector3<double> that = vt / v_slip;
-          double mu_regularized = mu_coulomb;
-          const double s = v_slip / stiction_tolerance;
-          if (s < 1)
-          {
-            mu_regularized = mu_coulomb * s * (2.0 - s);
-          }
-
-          const Vector3<double> f_slip = -mu_regularized * that * fn;
-
-          const Vector3<double> f = f_slip + fn * pc.n;
-
-          const mjtNum point[3] = {pc.p[0], pc.p[1], pc.p[2]};
-          const mjtNum torque[3] = {0, 0, 0};
-          const mjtNum forceA[3] = {f[0], f[1], f[2]};
-          const mjtNum forceB[3] = {-f[0], -f[1], -f[2]};
-          mj_applyFT(m, d, forceA, torque, point, m->geom_bodyid[g1], d->qfrc_passive);
-          mj_applyFT(m, d, forceB, torque, point, m->geom_bodyid[g2], d->qfrc_passive);
-        }
-
-        // visualize collision force:
-        // int id = contactProperties[g1]->contact_type == SOFT ? g1 : g2;
-        // // ContactProperties *cp =
-        // //     contactProperties[g1]->contact_type == SOFT ? contactProperties[g1] : contactProperties[g2];
-        // if (m->geom_type[id] == mjGEOM_BOX) {
-        // 	// std::cout << "mujoco_contact_surfaces: " << "fn: " << fn);
-        // 	const float rgba[4] = { std::min(1. - fn, 1.), 0, std::max(fn, 0.0), 0.8 };
-        // 	mjtNum pos[3];
-        // 	mjtNum size[3];
-        // 	for (int i = 0; i < 3; ++i) {
-        // 		pos[i]  = d->geom_xpos[3 * id + i];
-        // 		size[i] = m->geom_size[3 * id + i];
-        // 	}
-        // 	mjtNum rot[9];
-        // 	for (int i = 0; i < 9; ++i) {
-        // 		rot[i] = d->geom_xmat[9 * id + i];
-        // 	}
-        // 	if (n_vGeom == MAX_VGEOM) {
-        // 		break;
-        // 	}
-        // 	mjvGeom *g = vGeoms + n_vGeom++;
-        // 	mjv_initGeom(g, mjGEOM_BOX, size, pos, rot, rgba);
-        // }
-        // visualize
-        if (visualizeContactSurfaces)
-        {
-          current_scale = std::max(current_scale, std::abs(fn));
-          if (gc->s->is_triangle())
-          {
-            visualizeMeshElement(pc.face, gc->s->tri_mesh_W(), fn);
-          }
-          else
-          {
-            visualizeMeshElement(pc.face, gc->s->poly_mesh_W(), fn);
-          }
-        }
-      }
-    }
-    // for (const auto &plugin : cb_ready_plugins)
-    // {
-    //   plugin->update(m, d, geomCollisions);
-    // }
-    geomCollisions.clear();
-  }
-
   template <class T>
   void ContactSurfacesPlugin::visualizeMeshElement(int face, T mesh, double fn)
   {
@@ -570,19 +484,19 @@ namespace mujoco::plugin::contact_surfaces
         if (hcp.find("kTriangle") != std::string::npos)
         {
           hydroelastic_contact_representation = HydroelasticContactRepresentation::kTriangle;
-          std::cout << "mujoco_contact_surfaces: "
-                    << "Found HydroelasticContactRepresentation: kTriangle" << std::endl;
+          // std::cout << "mujoco_contact_surfaces: "
+          //           << "Found HydroelasticContactRepresentation: kTriangle" << std::endl;
         }
         else if (hcp.find("kPolygon") != std::string::npos)
         {
           hydroelastic_contact_representation = HydroelasticContactRepresentation::kPolygon;
-          std::cout << "mujoco_contact_surfaces: "
-                    << "Found HydroelasticContactRepresentation: kPolygon" << std::endl;
+          // std:: << "mujoco_contact_surfaces: "
+          //           << "Found HydroelasticContactRepresentation: kPolygon" << std::endl;
         }
         else
         {
-          std::cout << "mujoco_contact_surfaces: "
-                    << "No HydroelasticContactRepresentation found. Using default: kPolygon" << std::endl;
+          // std::cout << "mujoco_contact_surfaces: "
+          //           << "No HydroelasticContactRepresentation found. Using default: kPolygon" << std::endl;
         }
       }
     }
@@ -856,9 +770,144 @@ namespace mujoco::plugin::contact_surfaces
   {
   }
 
+  // ContactSurfacesPlugin::~ContactSurfacesPlugin()
+  //   {
+  //     plugins.clear();
+  //     cb_ready_plugins.clear();
+  //   }
+
   void ContactSurfacesPlugin::Compute(const mjModel *m, mjData *d, int instance)
   {
-    passive_cb(m, d);
+    if (visualizeContactSurfaces)
+    {
+      // reset the visualized geoms
+      n_vGeom = 0;
+      running_scale = 0.9 * running_scale + 0.1 * current_scale;
+      current_scale = 0.;
+    }
+
+    const double stiction_tolerance = 1.0e-4; // TODO should this be hardcoded?
+    const double relative_tolerance = 1.0e-2;
+    for (GeomCollisionPtr gc : geomCollisions)
+    {
+      int g1 = gc->g1;
+      int g2 = gc->g2;
+      ContactProperties *cp1 = contactProperties[g1];
+      ContactProperties *cp2 = contactProperties[g2];
+      const CoulombFriction<double> &geometryM_friction =
+          CoulombFriction<double>{cp1->static_friction, cp1->dynamic_friction};
+      const CoulombFriction<double> &geometryN_friction =
+          CoulombFriction<double>{cp2->static_friction, cp2->dynamic_friction};
+      const CoulombFriction<double> combined_friction =
+          CalcContactFrictionFromSurfaceProperties(geometryM_friction, geometryN_friction);
+      const double mu_coulomb = combined_friction.dynamic_friction();
+      for (PointCollision pc : gc->pointCollisions)
+      {
+        const RigidTransform<double> &X_WA = getGeomPose(g1, d);
+        const RigidTransform<double> &X_WB = getGeomPose(g2, d);
+        const SpatialVelocity<double> &V_WA = getGeomVelocity(g1, m, d);
+        const SpatialVelocity<double> &V_WB = getGeomVelocity(g2, m, d);
+
+        const Vector3<double> p_AoAq_W = pc.p - X_WA.translation();
+        const SpatialVelocity<double> V_WAq = V_WA.Shift(p_AoAq_W);
+
+        // Next compute the spatial velocity of Body B at Bq.
+        const Vector3<double> p_BoBq_W = pc.p - X_WB.translation();
+        const SpatialVelocity<double> V_WBq = V_WB.Shift(p_BoBq_W);
+
+        // Finally compute the relative velocity of Frame Aq relative to Frame Bq,
+        // expressed in the world frame, and then the translational component of this
+        // velocity.
+        const SpatialVelocity<double> V_BqAq_W = V_WAq - V_WBq;
+        const Vector3<double> &v_BqAq_W = V_BqAq_W.translational();
+
+        // Get the velocity along the normal to the contact surface. Note that a
+        // positive value indicates that bodies are separating at Q while a negative
+        // value indicates that bodies are approaching at Q.
+        const double vn_BqAq_W = v_BqAq_W.dot(pc.n);
+
+        const double fn = std::max(0., 1. - pc.damping * vn_BqAq_W) * (pc.fn0 - 0.001 * pc.stiffness * vn_BqAq_W);
+
+        if (applyContactSurfaceForces)
+        {
+          const Vector3<double> vt = v_BqAq_W - pc.n * vn_BqAq_W;
+          double epsilon = stiction_tolerance * relative_tolerance;
+          epsilon = epsilon * epsilon;
+          const double v_slip = std::sqrt(vt.squaredNorm() + epsilon);
+          const Vector3<double> that = vt / v_slip;
+          double mu_regularized = mu_coulomb;
+          const double s = v_slip / stiction_tolerance;
+          if (s < 1)
+          {
+            mu_regularized = mu_coulomb * s * (2.0 - s);
+          }
+
+          const Vector3<double> f_slip = -mu_regularized * that * fn;
+
+          const Vector3<double> f = f_slip + fn * pc.n;
+
+          const mjtNum point[3] = {pc.p[0], pc.p[1], pc.p[2]};
+          const mjtNum torque[3] = {0, 0, 0};
+          const mjtNum forceA[3] = {f[0], f[1], f[2]};
+          const mjtNum forceB[3] = {-f[0], -f[1], -f[2]};
+          mj_applyFT(m, d, forceA, torque, point, m->geom_bodyid[g1], d->qfrc_passive);
+          mj_applyFT(m, d, forceB, torque, point, m->geom_bodyid[g2], d->qfrc_passive);
+        }
+
+        // visualize collision force:
+        // int id = contactProperties[g1]->contact_type == SOFT ? g1 : g2;
+        // // ContactProperties *cp =
+        // //     contactProperties[g1]->contact_type == SOFT ? contactProperties[g1] : contactProperties[g2];
+        // if (m->geom_type[id] == mjGEOM_BOX) {
+        // 	// std::cout << "mujoco_contact_surfaces: " << "fn: " << fn);
+        // 	const float rgba[4] = { std::min(1. - fn, 1.), 0, std::max(fn, 0.0), 0.8 };
+        // 	mjtNum pos[3];
+        // 	mjtNum size[3];
+        // 	for (int i = 0; i < 3; ++i) {
+        // 		pos[i]  = d->geom_xpos[3 * id + i];
+        // 		size[i] = m->geom_size[3 * id + i];
+        // 	}
+        // 	mjtNum rot[9];
+        // 	for (int i = 0; i < 9; ++i) {
+        // 		rot[i] = d->geom_xmat[9 * id + i];
+        // 	}
+        // 	if (n_vGeom == MAX_VGEOM) {
+        // 		break;
+        // 	}
+        // 	mjvGeom *g = vGeoms + n_vGeom++;
+        // 	mjv_initGeom(g, mjGEOM_BOX, size, pos, rot, rgba);
+        // }
+        // visualize
+        if (visualizeContactSurfaces)
+        {
+          current_scale = std::max(current_scale, std::abs(fn));
+          if (gc->s->is_triangle())
+          {
+            visualizeMeshElement(pc.face, gc->s->tri_mesh_W(), fn);
+          }
+          else
+          {
+            visualizeMeshElement(pc.face, gc->s->poly_mesh_W(), fn);
+          }
+        }
+      }
+    }
+    int id;
+    for (id = 0; id < m->nsensor; ++id)
+    {
+      if (m->sensor_type[id] == mjSENS_PLUGIN &&
+          m->sensor_plugin[id] == instance)
+      {
+        break;
+      }
+    }
+    int sensor_adr = m->sensor_adr[id];
+    for (const auto &plugin : cb_ready_plugins)
+    {
+      plugin->update(m, d, geomCollisions, sensor_adr);
+      sensor_adr += plugin->getSensorSize();
+    }
+    geomCollisions.clear();
   }
 
   void ContactSurfacesPlugin::Visualize(const mjModel *m, mjData *d, mjvScene *scn,
@@ -872,9 +921,9 @@ namespace mujoco::plugin::contact_surfaces
     mjp_defaultPlugin(&plugin);
 
     plugin.name = "mujoco.contact_surfaces";
-    plugin.capabilityflags |= mjPLUGIN_PASSIVE;
+    plugin.capabilityflags |= mjPLUGIN_PASSIVE | mjPLUGIN_SENSOR;
 
-    const char *attributes[] = {"sensor_config_path"};
+    const char *attributes[] = {"sensor_config"};
     plugin.nattribute = sizeof(attributes) / sizeof(attributes[0]);
     plugin.attributes = attributes;
     plugin.nstate = +[](const mjModel *m, int instance)
@@ -887,7 +936,7 @@ namespace mujoco::plugin::contact_surfaces
       {
         return -1;
       }
-      contact_surfaces_plugin_or_null->load(m, d);
+      contact_surfaces_plugin_or_null->load(m, d, instance);
       instance_id = instance;
       d->plugin_data[instance] = reinterpret_cast<uintptr_t>(
           new ContactSurfacesPlugin(std::move(*contact_surfaces_plugin_or_null)));
@@ -902,14 +951,46 @@ namespace mujoco::plugin::contact_surfaces
     plugin.compute =
         +[](const mjModel *m, mjData *d, int instance, int capability_bit)
     {
-      auto *contact_surfaces_plugin = reinterpret_cast<ContactSurfacesPlugin *>(d->plugin_data[instance]);
-      contact_surfaces_plugin->Compute(m, d, instance);
+      // std::cout << "plugin.compute " << capability_bit << std::endl;
+      if (capability_bit & mjPLUGIN_PASSIVE)
+      {
+        auto *contact_surfaces_plugin = reinterpret_cast<ContactSurfacesPlugin *>(d->plugin_data[instance]);
+        contact_surfaces_plugin->Compute(m, d, instance);
+      }
     };
     plugin.visualize = +[](const mjModel *m, mjData *d, mjvScene *scn,
                            int instance)
     {
       auto *contact_surfaces_plugin = reinterpret_cast<ContactSurfacesPlugin *>(d->plugin_data[instance]);
       contact_surfaces_plugin->Visualize(m, d, scn, instance);
+    };
+    plugin.nsensordata = +[](const mjModel *m, int instance, int sensor_id)
+    {
+      int size = 0;
+      std::string sensor_config = mj_getPluginConfig(m, instance, "sensor_config");
+      if (!sensor_config.empty() and std::filesystem::exists(sensor_config))
+      {
+        YAML::Node root = YAML::LoadFile(sensor_config);
+
+        for (YAML::Node config : root["MujocoPlugins"])
+        {
+          for (int i = 0; i < config["SurfacePlugins"].size(); ++i)
+          {
+            YAML::Node p = config["SurfacePlugins"][i];
+            assert(p.IsMap());
+            assert(p["type"].IsDefined());
+            if (p["type"].as<std::string>() == "mujoco_contact_surface_sensors/TaxelSensor" && p["taxels"].IsDefined() && p["method"].IsDefined() &&
+                p["include_margin"].IsDefined() && p["sample_resolution"].IsDefined())
+            {
+              size += p["taxels"].size();
+            }
+            if (p["type"].as<std::string>() == "mujoco_contact_surface_sensors/FlatTactileSensor")
+            {
+            }
+          }
+        }
+      }
+      return size;
     };
 
     mjp_registerPlugin(&plugin);

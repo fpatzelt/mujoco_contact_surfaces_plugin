@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2023, Bielefeld University
+ *  Copyright (c) 2022, Bielefeld University
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -31,52 +31,63 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
-
 /* Authors: Florian Patzelt*/
 
 #pragma once
 
-#include <drake/geometry/query_results/contact_surface.h>
-#include <boost/shared_ptr.hpp>
-#include <yaml-cpp/yaml.h>
-#include <mujoco.h>
-// #include <mujoco_ros/common_types.h>
+#include <mujoco_contact_surfaces_plugin/plugin_utils.h>
+// #include <tactile_msgs/TactileState.h>
 
-namespace mujoco::plugin::contact_surfaces {
+namespace mujoco::plugin::contact_surfaces::sensors {
+using namespace mujoco::plugin::contact_surfaces;
 
-// Maximum number of geoms for visualization
-const int MAX_VGEOM = 10000;
+// using namespace std::chrono;
+// using namespace MujocoSim;
 
-// Point collision that approximates a collision area
-typedef struct PointCollision
+class TactileSensorBase : public SurfacePlugin
 {
-	drake::Vector3<double> p;
-	drake::Vector3<double> n;
-	double fn0;
-	double stiffness;
-	double damping;
-	int face;
-} PointCollision;
+public:
+	// Overlead entry point
+	virtual bool load(const mjModel * m, mjData * d);
+	virtual void update(const mjModel *m, mjData *d, const std::vector<GeomCollisionPtr> &geomCollisions, int &sensor_adr);
+	// virtual void renderCallback(mjModel * model, mjData * data, mjvScene *scene);
+	virtual void reset();
 
-// Collision between two geoms
-typedef struct GeomCollision
-{
-	std::vector<PointCollision> pointCollisions;
-	std::shared_ptr<drake::geometry::ContactSurface<double>> s;
-	int g1;
-	int g2;
-	GeomCollision(int g1, int g2, drake::geometry::ContactSurface<double> *s) : g1(g1), g2(g2), s(s){};
-} GeomCollision;
+private:
+	// Buffer of visual geoms
+	// color scaling factors for tactile visualization
+	double tactile_running_scale = 3.;
+	double tactile_current_scale = 0.;
 
-// SurfacePlugin
-class SurfacePlugin;
+protected:
+	// MuJoCo id of the geom this sensor is attached to
+	int geomID;
+	// Name of the geom this sensor is attached to
+	std::string geomName;
 
-/**
- * @def SurfacePluginPtr
- * @brief boost::shared_ptr to SurfacePlugin
- */
-typedef boost::shared_ptr<SurfacePlugin> SurfacePluginPtr;
-typedef boost::shared_ptr<GeomCollision> GeomCollisionPtr;
+	// update frequency of the sensor
+	double updateRate;
+	// ros::Duration updatePeriod;
+	double updatePeriod;
+	// time of last sensor update
+	// ros::Time lastUpdate;
+	double lastUpdate;
 
+	// ros publisher for sensor data
+	// ros::Publisher publisher;
+	// tactile_msgs::TactileState tactile_state_msg_;
+	std::string topicName;
+	std::string sensorName;
 
-} // namespace mujoco::plugin::contact_surfaces
+	bool visualize = false;
+	// geom buffer used for visualization
+	// mjvGeom *vGeoms;
+	// number of geoms in vGeoms
+	// int n_vGeom = 0;
+	// bool initVGeom(int type, const mjtNum size[3], const mjtNum pos[3], const mjtNum mat[9], const float rgba[4]);
+	virtual void internal_update(const mjModel *m, mjData *d, const std::vector<GeomCollisionPtr> &geomCollisions, int &sensor_adr){};
+
+private:
+};
+
+} // namespace mujoco::plugin::contact_surfaces::sensors

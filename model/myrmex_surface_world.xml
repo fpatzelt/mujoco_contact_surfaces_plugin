@@ -17,9 +17,16 @@
 
   <extension>
     <plugin plugin="mujoco.contact_surfaces">
-      <instance name="contact_surfaces"/>
+      <instance name="contact_surfaces">
+        <!-- Path to the sensor file. The path has to be absolute or relative to the plugin library -->
+        <config key="sensor_config" value="config/flat_taxel_sensor.yaml" />
+      </instance>
     </plugin>
   </extension>
+
+  <sensor>
+    <plugin name="tactile_sensor" instance="contact_surfaces"/>
+  </sensor>
 
   <custom>
     <!-- All custom parameters related to contact surfaces have the prefix cs:: -->

@@ -1,7 +1,7 @@
 /**
  *
  * Parts of the code used to evaluate the contact surfaces
- * (namely the methods evaluateContactSurfaces and passive_cb)
+ * (namely the methods evaluateContactSurfaces and Compute)
  * are based on code of Drake which is licensed as follows:
  *
  * All components of Drake are licensed under the BSD 3-Clause License
@@ -82,12 +82,12 @@
 #include <optional>
 #include <vector>
 #include <chrono>
+#include <filesystem>
 // #include <pluginlib/class_loader.h>
 
 // #include <mujoco_ros/mujoco_sim.h>
 // #include <mujoco_ros/plugin_utils.h>
 
-#include <mujoco/mujoco.h>
 
 #include <drake/geometry/proximity/make_sphere_mesh.h>
 #include <drake/geometry/proximity/make_sphere_field.h>
@@ -115,7 +115,10 @@
 #include <drake/multibody/triangle_quadrature/gaussian_triangle_quadrature_rule.h>
 // #include <pluginlib/class_loader.h>
 #include <mujoco_contact_surfaces_plugin/common_types.h>
-// #include <mujoco_contact_surfaces/plugin_utils.h>
+#include <mujoco_contact_surfaces_plugin/plugin_utils.h>
+#include <mujoco_contact_surfaces_plugin/flat_tactile_sensor.h>
+#include <mujoco_contact_surfaces_plugin/tactile_sensor_base.h>
+#include <mujoco_contact_surfaces_plugin/taxel_sensor.h>
 
 namespace mujoco::plugin::contact_surfaces {
 
@@ -204,10 +207,10 @@ typedef struct ContactProperties
 class ContactSurfacesPlugin
 {
 public:
-	// ~MujocoContactSurfacesPlugin();
+	~ContactSurfacesPlugin() = default;
 
 	// Overlead entry point
-	bool load(const mjModel * m, mjData * d);
+	bool load(const mjModel * m, mjData * d, int instance);
 
 	void renderCallback(mjModel * model, mjData * data, mjvScene *scene);
 
@@ -219,7 +222,6 @@ public:
 
   static std::optional<ContactSurfacesPlugin> Create(const mjModel* m, mjData* d, int instance);
   ContactSurfacesPlugin(ContactSurfacesPlugin&&) = default;
-  ~ContactSurfacesPlugin() = default;
 
   void Compute(const mjModel* m, mjData* d, int instance);
   void Visualize(const mjModel* m, mjData* d, mjvScene* scn, int instance);
@@ -260,7 +262,7 @@ private:
 	// Interface loader
 	// boost::shared_ptr<pluginlib::ClassLoader<SurfacePlugin>> surface_plugin_loader;
 	// list of registered and loaded plugins
-	// std::vector<SurfacePluginPtr> plugins, cb_ready_plugins;
+	std::vector<SurfacePluginPtr> plugins, cb_ready_plugins;
 };
 
 // } // namespace mujoco_contact_surfaces
